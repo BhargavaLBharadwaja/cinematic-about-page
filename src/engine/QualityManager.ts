@@ -35,9 +35,10 @@ export class QualityManager {
   get value(): QualitySettings { return this.settings; }
   get isReducedMotion(): boolean { return this.reducedMotion; }
 
+  private isMobile() { return window.matchMedia('(max-width: 700px)').matches || navigator.maxTouchPoints > 1; }
+
   private detectLevel(): QualityLevel {
-    const mobile = window.matchMedia('(max-width: 700px)').matches || navigator.maxTouchPoints > 1;
-    if (this.reducedMotion || mobile) return 'MEDIUM';
+    if (this.reducedMotion || this.isMobile()) return 'MEDIUM';
     const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
     const cores = navigator.hardwareConcurrency ?? 4;
     if (memory >= 8 && cores >= 8 && window.devicePixelRatio >= 1.5) return 'ULTRA';
@@ -46,7 +47,7 @@ export class QualityManager {
   }
 
   private createSettings(level: QualityLevel): QualitySettings {
-    const mobile = window.matchMedia('(max-width: 700px)').matches || navigator.maxTouchPoints > 1;
+    const mobile = this.isMobile();
     const base = levelSettings[level];
     const mobileScale = mobile ? 0.72 : 1;
     return {
@@ -61,7 +62,7 @@ export class QualityManager {
   }
 
   update(): QualitySettings {
-    const mobile = window.matchMedia('(max-width: 700px)').matches || navigator.maxTouchPoints > 1;
+    const mobile = this.isMobile();
     if (mobile !== this.settings.mobile) this.settings = this.createSettings(mobile ? 'MEDIUM' : this.settings.level);
     this.settings.dpr = Math.min(window.devicePixelRatio || 1, this.settings.mobile ? 1.15 : levelSettings[this.settings.level].dpr);
     return this.settings;
@@ -76,7 +77,7 @@ export class QualityManager {
     this.frameAccumulator = 0;
     this.frameCount = 0;
     if (fps < 42 && this.settings.level !== 'LOW') {
-      const next = this.settings.level === 'ULTRA' ? 'HIGH' : 'LOW';
+      const next: QualityLevel = this.settings.level === 'ULTRA' ? 'HIGH' : this.settings.level === 'HIGH' ? 'MEDIUM' : 'LOW';
       this.settings = this.createSettings(next);
       this.cooldown = 4;
     } else if (fps > 57 && !this.settings.mobile && this.settings.level === 'MEDIUM') {
