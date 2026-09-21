@@ -10,32 +10,27 @@ export function PersistentWebGLCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<ScrollState>(DEFAULT_SCROLL_STATE);
   const pointer = useRef(new THREE.Vector2());
-
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const canvas = canvasRef.current; if (!canvas) return;
     const quality = new QualityManager();
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setPixelRatio(quality.value.dpr);
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(42, 1, .1, 100);
     const cameraManager = new CameraManager(camera);
-    const sceneManager = new SceneManager(quality.value);
-    scene.add(sceneManager.root);
-    scene.add(new THREE.AmbientLight(0xffffff, 1.5));
-    const keyLight = new THREE.DirectionalLight(0x9ba8ff, 2.5);
-    keyLight.position.set(2, 3, 5); scene.add(keyLight);
+    const manager = new SceneManager(quality.value);
+    scene.add(manager.root, new THREE.AmbientLight(0xffffff, 1.25));
+    const key = new THREE.DirectionalLight(0x9ba8ff, 2.5); key.position.set(2, 3, 5); scene.add(key);
+    manager.atmosphere.setFog(scene, true);
     const scroll = new ScrollController();
-    const onState = (state: ScrollState) => { stateRef.current = state; };
-    const unsubscribe = scroll.subscribe(onState);
-    const onPointer = (event: PointerEvent) => { pointer.current.set((event.clientX / window.innerWidth - 0.5) * 2, (event.clientY / window.innerHeight - 0.5) * 2); };
-    const resize = () => { const width = window.innerWidth; const height = window.innerHeight; renderer.setPixelRatio(quality.update().dpr); renderer.setSize(width, height, false); cameraManager.resize(width, height); scroll.onResize(); };
-    window.addEventListener('resize', resize); window.addEventListener('pointermove', onPointer, { passive: true }); resize();
+    const unsubscribe = scroll.subscribe((state) => { stateRef.current = state; });
+    const onPointer = (event: PointerEvent) => pointer.current.set((event.clientX / innerWidth - .5) * 2, (event.clientY / innerHeight - .5) * 2);
+    const resize = () => { const width = innerWidth; const height = innerHeight; const dpr = quality.update().dpr; renderer.setPixelRatio(dpr); renderer.setSize(width, height, false); cameraManager.resize(width, height); manager.resize(dpr); scroll.onResize(); };
+    addEventListener('pointermove', onPointer, { passive: true }); addEventListener('resize', resize); resize();
     let frame = 0; let previous = performance.now();
-    const render = (now: number) => { const delta = Math.min((now - previous) / 1000, 0.05); previous = now; const state = stateRef.current; sceneManager.update(state, delta, pointer.current, quality.isReducedMotion); cameraManager.update(state, pointer.current, quality.isReducedMotion, delta); renderer.setClearColor(state.activeSection === 3 || state.activeSection === 5 ? 0x1550eb : state.activeSection === 0 || state.activeSection === 8 ? 0xf1f0ec : 0x08090b, 1); renderer.render(scene, camera); frame = requestAnimationFrame(render); };
+    const render = (now: number) => { const delta = Math.min((now - previous) / 1000, .05); previous = now; const state = stateRef.current; manager.update(state, delta, pointer.current, quality.isReducedMotion); cameraManager.update(state, pointer.current, quality.isReducedMotion, delta); const active = state.sections[state.activeSection]?.scene; renderer.setClearColor(active === 'contact' || active === 'expertise' ? 0x1550eb : active === 'connector' || active === 'projects' ? 0xf1f0ec : 0x08090b, 1); renderer.render(scene, camera); frame = requestAnimationFrame(render); };
     frame = requestAnimationFrame(render);
-    return () => { cancelAnimationFrame(frame); unsubscribe(); scroll.destroy(); sceneManager.dispose(); renderer.dispose(); window.removeEventListener('resize', resize); window.removeEventListener('pointermove', onPointer); };
+    return () => { cancelAnimationFrame(frame); unsubscribe(); scroll.destroy(); manager.dispose(); renderer.dispose(); removeEventListener('pointermove', onPointer); removeEventListener('resize', resize); };
   }, []);
   return <canvas ref={canvasRef} className="webgl" aria-hidden="true" />;
 }
